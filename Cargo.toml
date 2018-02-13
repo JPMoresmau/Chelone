@@ -1,0 +1,8 @@
+[package]
+name = "chelone"
+version = "0.1.0"
+authors = ["Aaron Power <theaaronepower@gmail.com>"]
+
+[dependencies]
+pest = "1"
+pest_derive = "1"
