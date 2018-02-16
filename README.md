@@ -1,3 +1,7 @@
+# Chelone: A RDF Turtle parser
+Chelone is a [rdf turtle](https://www.w3.org/TR/turtle/) parser.
+
+```rust
 extern crate chelone;
 
 use chelone::Graph;
@@ -23,3 +27,4 @@ fn main() {
 
     println!("{}", triples);
 }
+```
