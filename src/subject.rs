@@ -5,7 +5,7 @@ use std::fmt;
 use iri::{BlankNode, Iri};
 
 /// The subject of a Triple.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Subject {
     /// An IRI
     Iri(Iri),
@@ -13,13 +13,21 @@ pub enum Subject {
     BlankNode(BlankNode),
 }
 
+impl Subject {
+    /// Is the subject a blank node
+    pub fn is_blank_node(&self) -> bool {
+        match *self {
+            Subject::BlankNode(_) => true,
+            _ => false,
+        }
+    }
+}
+
 impl fmt::Display for Subject {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let val = match *self {
-            Subject::Iri(ref iri) => iri.to_string(),
-            Subject::BlankNode(ref node) => node.to_string(),
-        };
-
-        write!(f, "{}", val)
+        match *self {
+            Subject::Iri(ref iri) => iri.fmt(f),
+            Subject::BlankNode(ref node) => node.fmt(f),
+        }
     }
 }

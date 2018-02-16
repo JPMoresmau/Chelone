@@ -178,14 +178,11 @@ impl<'a> Graph<'a> {
             },
 
             Rule::blankNodePropertyList => {
-                self.take();
-                self.save_subject();
-                self.save_predicate();
-                self.subject = Some(Subject::BlankNode(self.generate_new_blank_node()));
-                self.parse_predicate_object_list()?;
+                self.parse_blank_node_property_list()?;
 
-                self.pop_subject();
-                self.pop_predicate();
+                if self.input.peek()?.as_rule() == Rule::predicateObjectList {
+                    self.parse_predicate_object_list()?;
+                }
             }
 
             _ => unreachable!(),
@@ -196,7 +193,7 @@ impl<'a> Graph<'a> {
     fn parse_predicate_object_list(&mut self) -> Option<()> {
         let end_of_list = self.input.next()?.into_span().end();
 
-        while self.belongs_to_list(Rule::verb, end_of_list)? {
+        while self.belongs_to_list(Rule::verb, end_of_list) {
             self.predicate = Some(self.parse_verb()?);
             self.parse_object_list()?;
         }
@@ -229,12 +226,13 @@ impl<'a> Graph<'a> {
         self.take();
 
         let node = match self.input.peek()?.as_rule() {
-            Rule::BLANK_NODE_VALUE => BlankNode(String::from(self.input.next()?.as_str())),
+            Rule::BLANK_NODE_LABEL => {
+                self.take();
+                BlankNode(String::from(self.input.next()?.as_str()))
+            },
             Rule::ANON => self.generate_new_blank_node(),
-            _ => unreachable!(),
+            r => unreachable!("unexpected: {:?}", r),
         };
-
-        self.take();
 
         Some(node)
     }
@@ -242,7 +240,7 @@ impl<'a> Graph<'a> {
     fn parse_object_list(&mut self) -> Option<()> {
         let end_of_list = self.input.next()?.into_span().end();
 
-        while self.belongs_to_list(Rule::object, end_of_list)? {
+        while self.belongs_to_list(Rule::object, end_of_list) {
             self.parse_object()?;
         }
 
@@ -276,24 +274,26 @@ impl<'a> Graph<'a> {
         self.save_subject();
         self.save_predicate();
 
-        let end = self.input.next()?.into_span().end();
+        let end = self.input.next().unwrap().into_span().end();
         let mut node = self.generate_new_blank_node();
 
-        if !self.belongs_to_list(Rule::object, end)? {
-            Some(Object::Iri(Iri(String::from(rdf!("nil")))))
+        if !self.belongs_to_list(Rule::object, end) {
+            Some(Object::Iri(rdf!("nil")))
         } else {
             self.subject = Some(Subject::BlankNode(node.clone()));
-            self.predicate = Some(Iri(String::from(rdf!("rest"))));
-            self.emit_triple(Object::Iri(Iri(String::from(rdf!("nil")))));
-            self.parse_object()?;
-            while self.belongs_to_list(Rule::object, end)? {
+            self.predicate = Some(rdf!("rest"));
+            self.emit_triple(Object::Iri(rdf!("nil")));
+            self.predicate = Some(rdf!("first"));
+            self.parse_object().unwrap();
+
+            while self.belongs_to_list(Rule::object, end) {
                 let new_node = self.generate_new_blank_node();
                 self.subject = Some(Subject::BlankNode(new_node.clone()));
-                self.predicate = Some(Iri(String::from(rdf!("first"))));
-                self.parse_object()?;
+                self.predicate = Some(rdf!("first"));
+                self.parse_object().unwrap();
 
-                self.predicate = Some(Iri(String::from(rdf!("rest"))));
-                self.emit_triple(Object::BlankNode(node.clone()))?;
+                self.predicate = Some(rdf!("rest"));
+                self.emit_triple(Object::BlankNode(node.clone())).unwrap();
                 node = new_node;
             }
 
@@ -336,8 +336,8 @@ impl<'a> Graph<'a> {
 
         Some(Literal::RdfLiteral {
             value,
-            language_tag: None,
-            iri: None,
+            language_tag: self.parse_langtag(),
+            iri: self.parse_datatype(),
         })
     }
 
@@ -387,6 +387,22 @@ impl<'a> Graph<'a> {
         }
 
         Some(string)
+    }
+
+    fn parse_langtag(&mut self) -> Option<String> {
+        if self.input.peek()?.as_rule() == Rule::LANGTAG {
+            Some(self.input.next()?.as_str().replace("@", ""))
+        } else {
+            None
+        }
+    }
+
+    fn parse_datatype(&mut self) -> Option<Iri> {
+        if self.input.peek()?.as_rule() == Rule::iri {
+            self.parse_iri()
+        } else {
+            None
+        }
     }
 
     fn parse_echar(&mut self) -> Option<char> {
@@ -487,10 +503,12 @@ impl<'a> Graph<'a> {
         Some(())
     }
 
-    fn belongs_to_list(&mut self, rule: Rule, end: usize) -> Option<bool> {
-        let peek = self.input.peek()?;
-
-        Some(peek.as_rule() == rule && end > peek.clone().into_span().start())
+    fn belongs_to_list(&mut self, rule: Rule, end: usize) -> bool {
+        if let Some(peek) = self.input.peek() {
+            peek.as_rule() == rule && end > peek.clone().into_span().start()
+        } else {
+            false
+        }
     }
 
     fn save_subject(&mut self) {

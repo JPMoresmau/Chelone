@@ -5,18 +5,18 @@ use iri::Iri;
 
 macro_rules! rdf {
     ($typ:expr) => {
-        concat!("http://www.w3.org/1999/02/22-rdf-syntax-ns#", $typ)
+        Iri(concat!("http://www.w3.org/1999/02/22-rdf-syntax-ns#", $typ).into())
     };
 }
 
 macro_rules! xsd {
     ($typ:expr) => {
-        concat!("http://www.w3.org/2001/XMLSchema#", $typ)
+        Iri(concat!("http://www.w3.org/2001/XMLSchema#", $typ).into())
     };
 }
 
 /// A Literal
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Literal {
     /// A RDF literal
     RdfLiteral {
@@ -41,11 +41,11 @@ pub enum Literal {
 impl Literal {
 
     /// The datatype of the literal.
-    pub fn datatype(&self) -> &str {
+    pub fn datatype(&self) -> Iri {
         match *self {
             Literal::RdfLiteral { ref language_tag, ref iri, .. } => {
                 if let Some(iri) = iri.as_ref() {
-                    iri
+                    iri.clone()
                 } else if let Some(_) = language_tag.as_ref() {
                     rdf!("langString")
                 } else {

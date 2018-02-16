@@ -6,7 +6,7 @@ use literal::Literal;
 use subject::Subject;
 
 /// The object at end of a Triple.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Object {
     /// An Iri
     Iri(Iri),
@@ -30,9 +30,9 @@ impl Object {
 impl fmt::Display for Object {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Object::Iri(ref iri) => write!(f, "{}", iri),
-            Object::BlankNode(ref node) => write!(f, "{}", node),
-            Object::Literal(ref literal) => write!(f, "{}", literal),
+            Object::Iri(ref iri) => iri.fmt(f),
+            Object::BlankNode(ref node) => node.fmt(f),
+            Object::Literal(ref literal) => literal.fmt(f),
         }
     }
 }

@@ -53,7 +53,7 @@ IRI_VALUE = ${
 
 PNAME_NS = ${ PN_PREFIX? ~ ":" }
 PNAME_LN = ${ PNAME_NS ~ PN_LOCAL }
-BLANK_NODE_LABEL = @{
+BLANK_NODE_LABEL = ${
     "_:" ~ BLANK_NODE_VALUE
 }
 
