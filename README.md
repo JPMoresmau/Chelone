@@ -1,6 +1,10 @@
 # Chelone: A RDF Turtle parser
 Chelone is a [rdf turtle](https://www.w3.org/TR/turtle/) parser.
 
+```toml
+chelone = "0.1"
+```
+
 ```rust
 extern crate chelone;
 
