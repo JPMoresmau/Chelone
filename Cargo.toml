@@ -6,7 +6,7 @@ keywords = ["turtle", "parser", "rdf"]
 license = "MIT/Apache-2.0"
 name = "chelone"
 repository = "https://github.com/Aaronepower/chelone.git"
-version = "0.1.1"
+version = "0.1.2"
 
 [dependencies]
 pest = "1"
