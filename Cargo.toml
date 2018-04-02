@@ -16,4 +16,5 @@ itertools = "0.7"
 petgraph = "0.4"
 
 [build-dependencies]
-chelone = "0.1"
+chelone = { git = "https://github.com/Aaronepower/chelone" branch = "bootstrap" }
+url = "1"

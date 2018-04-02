@@ -473,11 +473,11 @@ impl<'a> Graph<'a> {
     fn parse_pname_ns(&mut self) -> Option<Iri> {
         self.take();
 
-        let prefix = if self.input.next()?.as_str() == ":" {
+        let prefix = /*if self.input.next()?.as_str() == ":" {
             ""
-        } else {
+        } else {*/
             self.input.next()?.as_str()
-        };
+        /* }*/;
 
         Some(self.prefixs[prefix].clone())
     }
