@@ -4,11 +4,11 @@ use std::ops::{Deref, DerefMut};
 
 /// Iri with containing url, inner string does not contain wrapping `<>`, they
 /// can be added by calling `iri.to_string`.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Iri(pub String);
 
 /// A blank node generated at parse time.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BlankNode(pub String);
 
 impl Deref for Iri {

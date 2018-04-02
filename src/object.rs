@@ -6,7 +6,7 @@ use literal::Literal;
 use subject::Subject;
 
 /// The object at end of a Triple.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Object {
     /// An Iri
     Iri(Iri),
@@ -17,6 +17,21 @@ pub enum Object {
 }
 
 impl Object {
+    /// Checks ig the object is a blank node.
+    pub fn is_blank_node(&self) -> bool {
+        match *self {
+            Object::BlankNode(_) => true,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn into_blank_node(self) -> Option<BlankNode> {
+        match self {
+            Object::BlankNode(b) => Some(b),
+            _ => None,
+        }
+    }
+
     pub(crate) fn to_subject(self) -> Subject {
         match self {
             Object::Iri(iri) => Subject::Iri(iri),

@@ -3,9 +3,10 @@
 use std::fmt;
 
 use iri::{BlankNode, Iri};
+use object::Object;
 
 /// The subject of a Triple.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Subject {
     /// An IRI
     Iri(Iri),
@@ -19,6 +20,20 @@ impl Subject {
         match *self {
             Subject::BlankNode(_) => true,
             _ => false,
+        }
+    }
+
+    pub(crate) fn as_object(&self) -> Object {
+        match *self {
+            Subject::BlankNode(ref b) => Object::BlankNode(b.clone()),
+            Subject::Iri(ref i) => Object::Iri(i.clone()),
+        }
+    }
+
+    pub(crate) fn into_blank_node(self) -> Option<BlankNode> {
+        match self {
+            Subject::BlankNode(b) => Some(b),
+            _ => None,
         }
     }
 }

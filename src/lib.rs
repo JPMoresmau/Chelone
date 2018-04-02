@@ -33,6 +33,8 @@
 #[macro_use] extern crate pest_derive;
 extern crate pest;
 extern crate url;
+extern crate itertools;
+extern crate petgraph;
 
 #[macro_use] pub mod literal;
 pub mod iri;
@@ -79,17 +81,6 @@ impl<'a> Graph<'a> {
     pub fn new(source: &'a str) -> Result<Self, pest::Error<Rule>> {
         let parsed = TurtleParser::parse(Rule::turtleDoc, source)?;
         let input = parsed.flatten().peekable();
-
-        if false {
-            for pair in input.clone() {
-                let rule = pair.as_rule();
-                let span = pair.into_span();
-
-                println!("RULE: {:?}", rule);
-                println!("SPAN: {:?}", span);
-                println!("TEXT: {}", span.as_str());
-            }
-        }
 
         Ok(Graph {
             input,
@@ -143,17 +134,14 @@ impl<'a> Graph<'a> {
         match rule {
             Rule::prefixID | Rule::sparqlPrefix => {
                 let name = self.input.next()?;
-
                 let key = if name.as_str() == ":" {
                     String::new()
                 } else {
                     let prefix = self.input.next()?;
-
                     String::from(prefix.as_str())
                 };
 
                 let value = self.parse_iriref()?;
-
                 self.prefixs.insert(key, value);
             }
 
