@@ -1,3 +1,4 @@
+#[cfg(not(feature="no-test"))]
 extern crate chelone;
 extern crate url;
 
@@ -36,7 +37,10 @@ urls!{
     qt:    "http://www.w3.org/2001/sw/DataAccess/tests/test-query#"
 }
 
+#[cfg(feature="no-test")]
+fn main() {}
 
+#[cfg(not(feature="no-test"))]
 fn main() {
     let out_dir = env::var_os("OUT_DIR").expect("can't get OUT_DIR");
     let base_url = {

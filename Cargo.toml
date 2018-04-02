@@ -15,6 +15,9 @@ url = "1"
 itertools = "0.7"
 petgraph = "0.4"
 
+[features]
+no-test = []
+
 [build-dependencies]
-chelone = { git = "https://github.com/Aaronepower/chelone" branch = "bootstrap" }
+chelone = { git = "https://github.com/Aaronepower/chelone", features = ["no-test"] }
 url = "1"
