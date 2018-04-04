@@ -165,7 +165,6 @@ impl<'a> Graph<'a> {
 
         match self.input.peek()?.as_rule() {
             Rule::subject => {
-                self.take();
                 self.parse_subject()?;
                 self.parse_predicate_object_list()?;
             },
@@ -203,6 +202,8 @@ impl<'a> Graph<'a> {
     }
 
     fn parse_subject(&mut self) -> Option<()> {
+        self.take();
+
         let subject = match self.input.peek()?.as_rule() {
             Rule::iri => Subject::Iri(self.parse_iri()?),
             Rule::BlankNode => Subject::BlankNode(self.parse_blank_node()?),
@@ -342,7 +343,7 @@ impl<'a> Graph<'a> {
     }
 
     fn parse_numeric_literal(&mut self) -> Option<Literal> {
-        let end = self.input.next().unwrap().into_span().end();
+        self.take();
 
         let pair = self.input.next()?;
         let mut value = String::from(pair.as_str());
@@ -386,7 +387,7 @@ impl<'a> Graph<'a> {
                 match peek_rule {
                     Rule::ECHAR => string.push(self.parse_echar()?),
                     Rule::UCHAR => string.push(self.parse_uchar()?),
-                    _ => unreachable!(),
+                    _ => string.push_str(peek_str),
                 }
             } else {
                 string.push_str(value.as_str());
@@ -491,22 +492,57 @@ impl<'a> Graph<'a> {
     }
 
     fn parse_pname_ln(&mut self) -> Option<Iri> {
+        self.take();
+
         let mut iri = self.parse_pname_ns()?;
-        let local = self.input.next()?.as_str();
+        let pn_local_end = self.input.next().unwrap().into_span().end();
+        let mut local = String::new();
+        let mut peek = self.input.peek().cloned();
+
+        while let Some(pair) = peek {
+            let (start, rule, value) = {
+                let value = pair.as_str();
+                let rule = pair.as_rule();
+                let start = pair.into_span().start();
+
+                (start, rule, value)
+            };
+
+            if start < pn_local_end {
+                if rule == Rule::PN_LOCAL_ESC {
+                    local.push_str(&value.replace("\\", ""));
+                } else {
+                    local.push_str(value);
+                }
+
+                self.take();
+                peek = self.input.peek().cloned();
+            } else {
+                break
+            }
+        }
+
         iri.push_str(&local);
 
         Some(iri)
     }
 
     fn parse_pname_ns(&mut self) -> Option<Iri> {
-        self.take();
+        let (next_rule, next) = {
+            let next = self.input.next()?;
 
-        let prefix = if self.input.next()?.as_str() == ":" {
+            (next.as_rule(), next.as_str())
+        };
+
+        println!("RULE: {:?}; STR: {:?}", next_rule, next);
+        let prefix = if next == ":" {
             ""
         } else {
             self.input.next()?.as_str()
         };
 
+        println!("{:#?}", self);
+        println!("FAILING PREFIX: {:#?}", prefix);
         Some(self.prefixs[prefix].clone())
     }
 

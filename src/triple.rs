@@ -149,21 +149,6 @@ impl fmt::Display for Triples {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Triple(pub Subject, pub Iri, pub Object);
 
-impl Triple {
-
-    fn blank_subject(&self) -> bool {
-        self.0.is_blank_node()
-    }
-
-    fn contains_blank_nodes(&self) -> bool {
-        self.blank_subject() || self.2.is_blank_node()
-    }
-
-    fn only_grounded_nodes(&self) -> bool {
-        !self.contains_blank_nodes()
-    }
-}
-
 impl fmt::Display for Triple {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} {} {} .", self.0, self.1, self.2)
