@@ -126,13 +126,10 @@ PN_CHARS = _{
     '\u{203F}'..'\u{2040}'
 }
 
-PN_PREFIX = @{ PN_CHARS_BASE ~ (PN_CHARS | ( "." ~ PN_CHARS ))* }
+PN_PREFIX = @{ PN_CHARS_BASE ~ ("."* ~ PN_CHARS)* }
 PN_LOCAL = @{
     (PN_CHARS_U | ":" | '0'..'9' | PLX) ~
-    (
-        ( "."* ~ (PN_CHARS | ":" | PLX)+ )* |
-        (PN_CHARS | ":" | PLX)*
-    )
+    ( "."* ~ (PN_CHARS | ":" | PLX) )*
 }
 
 
