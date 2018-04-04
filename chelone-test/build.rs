@@ -41,7 +41,8 @@ fn main() {
     let out_dir = env::var_os("OUT_DIR").expect("can't get OUT_DIR");
     let base_url = {
         use std::fs;
-        let mut path = fs::canonicalize("tests/data/manifest.ttl").unwrap()
+        let mut path = fs::canonicalize("tests/data/manifest.ttl")
+            .unwrap()
             .into_os_string()
             .into_string()
             .unwrap();
@@ -136,4 +137,3 @@ fn read_to_graph(path: &str, base: Url) -> Triples {
     graph.set_base(base);
     graph.parse()
 }
-

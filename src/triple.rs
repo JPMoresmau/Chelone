@@ -31,7 +31,7 @@ impl Triples {
         let a = self.as_graph();
         let b = other.as_graph();
 
-        ::petgraph::algo::is_isomorphic(&a, &b)
+        ::petgraph::algo::is_isomorphic_matching(&a, &b, |x, y| x == y, |x, y| x == y)
     }
 
     fn as_graph(&self) -> Graph<Object, Iri> {

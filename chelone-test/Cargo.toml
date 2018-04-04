@@ -1,0 +1,12 @@
+[package]
+name = "chelone-test"
+version = "0.1.0"
+authors = ["Aaron Power <theaaronepower@gmail.com>"]
+
+[dev-dependencies]
+chelone = { path = ".." }
+url = "1"
+
+[build-dependencies]
+chelone = { path = ".." }
+url = "1"

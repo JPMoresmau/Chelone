@@ -15,6 +15,5 @@ url = "1"
 itertools = "0.7"
 petgraph = "0.4"
 
-[build-dependencies]
-chelone = { git = "https://github.com/Aaronepower/chelone" branch = "bootstrap" }
-url = "1"
+[workspace]
+members = ["chelone-test"]

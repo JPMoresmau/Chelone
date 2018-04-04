@@ -74,6 +74,7 @@ pub struct Graph<'a> {
     subject_stack: Vec<Subject>,
     predicate_stack: Vec<Iri>,
     triples: Triples,
+    source: &'a str
 }
 
 impl<'a> Graph<'a> {
@@ -92,6 +93,7 @@ impl<'a> Graph<'a> {
             subject_stack: Vec::default(),
             predicate_stack: Vec::default(),
             triples: Triples::default(),
+            source
         })
     }
 
@@ -102,8 +104,11 @@ impl<'a> Graph<'a> {
 
     /// Parse graph into a set of Triples.
     pub fn parse(mut self) -> Triples {
-        self.take();
+        if self.input.peek().is_none() {
+            return self.triples
+        }
 
+        self.take();
         while let Some(_) = self.input.peek() {
             if self.parse_statement().is_none() {
                 break
@@ -218,7 +223,10 @@ impl<'a> Graph<'a> {
                 self.take();
                 BlankNode(String::from(self.input.next()?.as_str()))
             },
-            Rule::ANON => self.generate_new_blank_node(),
+            Rule::ANON => {
+                self.take();
+                self.generate_new_blank_node()
+            },
             r => unreachable!("unexpected: {:?}", r),
         };
 
@@ -239,7 +247,11 @@ impl<'a> Graph<'a> {
         self.take();
 
         match self.input.peek()?.as_rule() {
-            r @ Rule::iri | r @ Rule::literal | r @ Rule::BlankNode | r @ Rule::collection => {
+            r @ Rule::iri |
+            r @ Rule::literal |
+            r @ Rule::BlankNode |
+            r @ Rule::collection =>
+            {
                 let object = match r {
                     Rule::iri => Object::Iri(self.parse_iri()?),
                     Rule::literal => Object::Literal(self.parse_literal()?),
@@ -330,15 +342,23 @@ impl<'a> Graph<'a> {
     }
 
     fn parse_numeric_literal(&mut self) -> Option<Literal> {
-        self.take();
+        let end = self.input.next().unwrap().into_span().end();
 
         let pair = self.input.next()?;
-        let value = String::from(pair.as_str());
+        let mut value = String::from(pair.as_str());
 
         Some(match pair.as_rule() {
             Rule::INTEGER => Literal::Integer(value),
             Rule::DECIMAL => Literal::Decimal(value),
-            Rule::DOUBLE => Literal::Double(value),
+            Rule::DOUBLE => {
+                if self.input.peek().map(|p| p.as_rule()) == Some(Rule::EXPONENT)
+                {
+                    value.push_str(pair.as_str());
+                    self.take();
+                }
+
+                Literal::Double(value)
+            }
             _ => unreachable!(),
         })
     }
@@ -354,7 +374,7 @@ impl<'a> Graph<'a> {
 
         let mut string = String::new();
 
-        while self.input.peek()?.as_rule() == Rule::STRING_VALUE {
+        while self.input.peek()?.as_rule().is_string_value() {
             let value = self.input.next()?;
             let (peek_rule, peek_str) = {
                 let peek = self.input.peek()?;
@@ -431,12 +451,18 @@ impl<'a> Graph<'a> {
     }
 
     fn parse_iriref(&mut self) -> Option<Iri> {
-        self.take();
-
+        let end = self.input.next().unwrap().into_span().end();
         let rule = self.input.peek()?.as_rule();
 
-        Some(if rule == Rule::IRI_VALUE {
-            let value = self.input.next()?;
+        let value = if rule == Rule::IRI_VALUE {
+            let mut value = self.input.next()?.as_str().to_owned();
+            let mut peek = self.input.peek().cloned();
+
+            while peek.is_some() && end > peek.unwrap().into_span().start() {
+                value.push(self.parse_uchar().unwrap());
+                peek = self.input.peek().cloned();
+            }
+
             let url = Url::options()
                 .base_url(self.base.as_ref())
                 .parse(value.as_str())
@@ -447,7 +473,9 @@ impl<'a> Graph<'a> {
             self.base.clone().map_or_else(|| Iri(String::new()), |u| {
                 Iri(String::from(u.as_str()))
             })
-        })
+        };
+
+        Some(value)
     }
 
     fn parse_prefixed_name(&mut self) -> Option<Iri> {
@@ -473,11 +501,11 @@ impl<'a> Graph<'a> {
     fn parse_pname_ns(&mut self) -> Option<Iri> {
         self.take();
 
-        let prefix = /*if self.input.next()?.as_str() == ":" {
+        let prefix = if self.input.next()?.as_str() == ":" {
             ""
-        } else {*/
+        } else {
             self.input.next()?.as_str()
-        /* }*/;
+        };
 
         Some(self.prefixs[prefix].clone())
     }
@@ -536,6 +564,7 @@ impl<'a> Graph<'a> {
     }
 
     fn unreachable(&mut self, rule: Rule, text: &str) -> ! {
+        println!("Source:\n\"\"\"\n{}\n\"\"\"", self.source);
         println!("Parser state:\n{:#?}", self);
 
         unreachable!("Unexpected {:?}: {:?}", rule, text)
