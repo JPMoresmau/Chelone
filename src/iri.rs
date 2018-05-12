@@ -36,3 +36,9 @@ impl fmt::Display for BlankNode {
         write!(f,"_:{}", self.0)
     }
 }
+
+impl From<String> for Iri {
+    fn from(value: String) -> Self {
+        Iri(value)
+    }
+}

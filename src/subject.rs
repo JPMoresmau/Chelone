@@ -38,6 +38,12 @@ impl Subject {
     }
 }
 
+impl From<Iri> for Subject {
+    fn from(iri: Iri) -> Self {
+        Subject::Iri(iri)
+    }
+}
+
 impl fmt::Display for Subject {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {

@@ -32,7 +32,10 @@ impl Object {
         }
     }
 
-    pub(crate) fn to_subject(self) -> Subject {
+    /// Converts an `Object` to a `Subject`
+    /// # Panics
+    /// If the `Object` is an `Object::Literal`.
+    pub fn to_subject(self) -> Subject {
         match self {
             Object::Iri(iri) => Subject::Iri(iri),
             Object::BlankNode(node) => Subject::BlankNode(node),
