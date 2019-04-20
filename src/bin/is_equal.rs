@@ -3,11 +3,10 @@ extern crate url;
 
 use std::env;
 
-use chelone::{Graph, Triples};
-use url::Url;
+use chelone::{Graph, Triples, Iri};
 
 fn main() {
-    let url = Url::parse("https://www.w3.org/2013/TurtleTests/").unwrap();
+    let url = Iri::parse("https://www.w3.org/2013/TurtleTests/").unwrap();
     let mut args = env::args();
 
     args.next();
@@ -22,7 +21,7 @@ fn main() {
     println!("{}", a.is_isomorphic(&mut b));
 }
 
-fn read_to_graph(path: &str, base: Url) -> Triples {
+fn read_to_graph(path: &str, base: Iri) -> Triples {
     use std::fs::File;
     use std::io::Read;
 
@@ -37,3 +36,4 @@ fn read_to_graph(path: &str, base: Url) -> Triples {
     graph.set_base(base);
     graph.parse()
 }
+

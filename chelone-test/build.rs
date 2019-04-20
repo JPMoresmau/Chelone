@@ -21,7 +21,7 @@ macro_rules! urls {
     ($($name:ident: $url:expr);+) => {
         $(
             macro_rules! $name {
-                ($suffix:expr) => { concat!($name!(), $suffix) };
+                ($suffix:expr) => { concat!($name!(), "#", $suffix) };
                 () => { $url }
             }
         )+
@@ -35,12 +35,10 @@ macro_rules! wrapped {
 }
 
 urls! {
-    rdf:  "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
-    rdft: "http://www.w3.org/ns/rdftest#";
-    mf:   "http://www.w3.org/2001/sw/DataAccess/tests/test-manifest#"
+    rdf:  "http://www.w3.org/1999/02/22-rdf-syntax-ns";
+    rdft: "http://www.w3.org/ns/rdftest";
+    mf:   "http://www.w3.org/2001/sw/DataAccess/tests/test-manifest"
 }
-
-
 
 fn main() {
     let out_dir = env::var_os("OUT_DIR").expect("can't get OUT_DIR");
@@ -53,25 +51,26 @@ fn main() {
             .expect("Couldn't covert path to string.");
         path.insert_str(0, "file://");
 
-        Url::parse(&path).expect("Couldn't convert path to url.")
+        path
     };
 
-    let rdf_nil = Iri(rdf!("nil").to_owned());
-    let rdf_nil_object = Object::Iri(rdf_nil.clone());
-    let rdf_first = Iri(rdf!("first").to_owned());
-    let rdf_rest = Iri(rdf!("rest").to_owned());
-    let mf_name = Iri(mf!("name").to_owned());
-    let mf_action = Iri(mf!("action").to_owned());
-    let mf_result = Iri(mf!("result").to_owned());
-    let rdf_type = Iri(rdf!("type").to_owned());
-    let triples = read_to_graph("tests/data/manifest.ttl", url)
+    let rdf_nil_object = Object::Iri(Iri::parse(rdf!("nil")).unwrap());
+    let rdf_first = Iri::parse(rdf!("first")).unwrap();
+    let rdf_rest = Iri::parse(rdf!("rest")).unwrap();
+    let mf_name = Iri::parse(mf!("name")).unwrap();
+    let mf_action = Iri::parse(mf!("action")).unwrap();
+    let mf_result = Iri::parse(mf!("result")).unwrap();
+    let rdf_type = Iri::parse(rdf!("type")).unwrap();
+    let triples = read_to_graph("tests/data/manifest.ttl", &url)
         .expect("Couldn't read manifest into graph.");
     let mut entries = Vec::new();
     let mut output = String::new();
 
+    let mf_entries = Iri::parse(mf!("entries")).unwrap();
+    eprintln!("{:?}", mf_entries);
 
     let mut last_node =  TripleSearcher::new()
-            .predicate(&Iri(mf!("entries").to_owned()))
+            .predicate(&mf_entries)
             .execute(&triples)
             .expect("No mf:entries field")
             .object;
@@ -160,12 +159,7 @@ fn main() {
                         let mut expected = read_to_triples("{expected}", "{base}");
 
                         if !result.is_isomorphic(&mut expected) {{
-                            panic!(r#"
-                            Expected:
-                            {{:#?}}
-                            Actual:
-                            {{:#?}}
-                            "#, expected, result);
+                            compare(result, expected);
                         }}
                     }}"##,
                     name = name,
@@ -184,12 +178,12 @@ fn main() {
         .expect("Couldn't write to tests.rs");
 }
 
-fn read_to_graph(path: &str, base: Url) -> Result<Triples, Box<Error>> {
+fn read_to_graph(path: &str, base: &str) -> Result<Triples, Box<Error>> {
     use std::fs;
 
     let input = fs::read_to_string(path)?;
     let mut graph = Graph::new(&input).unwrap_or_else(|e| panic!("{}", e));
 
-    graph.set_base(base);
+    graph.set_base(Iri::parse(base)?);
     Ok(graph.parse())
 }

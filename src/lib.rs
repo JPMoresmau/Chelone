@@ -27,7 +27,6 @@
 //! }
 //! ```
 
-#![cfg_attr(test, deny(missing_docs))]
 #![deny(missing_docs)]
 
 #[macro_use] extern crate pest_derive;
@@ -51,14 +50,13 @@ use std::fmt;
 
 use pest::Parser;
 use pest::iterators::FlatPairs;
-use url::Url;
 
-use iri::{BlankNode, Iri};
 use literal::Literal;
 use object::Object;
 use parser::{Rule, TurtleParser};
 use subject::Subject;
 
+pub use iri::{BlankNode, Iri};
 pub use triple::{Triple, Triples, TripleSearcher};
 
 #[cfg(debug_assertions)]
@@ -69,6 +67,7 @@ macro_rules! get {
     ($this:ident: $rule:expr) => {{
         use Rule::*;
         let next = $this.input.next()?;
+        // println!("{:?}", next.as_rule());
         assert_eq!(next.as_rule(), $rule);
         next
     }}
@@ -77,7 +76,7 @@ macro_rules! get {
 /// Graph parser.
 pub struct Graph<'a> {
     input: Peekable<FlatPairs<'a, Rule>>,
-    base: Option<Url>,
+    base: Option<Iri>,
     blank_node_counter: usize,
     prefixs: HashMap<String, Iri>,
     subject: Option<Subject>,
@@ -85,13 +84,13 @@ pub struct Graph<'a> {
     subject_stack: Vec<Subject>,
     predicate_stack: Vec<Iri>,
     triples: Triples,
-    source: &'a str
+    _source: &'a str
 }
 
 impl<'a> Graph<'a> {
     /// Creates a new `Graph` from the turtle source.
-    pub fn new(source: &'a str) -> Result<Self, pest::Error<Rule>> {
-        let parsed = TurtleParser::parse(Rule::turtleDoc, source)?;
+    pub fn new(_source: &'a str) -> Result<Self, pest::error::Error<Rule>> {
+        let parsed = TurtleParser::parse(Rule::turtleDoc, _source)?;
         let input = parsed.flatten().peekable();
 
         Ok(Graph {
@@ -104,19 +103,19 @@ impl<'a> Graph<'a> {
             subject_stack: Vec::default(),
             predicate_stack: Vec::default(),
             triples: Triples::default(),
-            source
+            _source
         })
     }
 
-    fn debug_input(input: Peekable<FlatPairs<'a, Rule>>) {
+    fn _debug_input(input: Peekable<FlatPairs<'a, Rule>>) {
         for pair in input {
             println!("RULE: {:?} STR: {:?}", pair.as_rule(), pair.as_str());
         }
     }
 
     /// Sets the initial base url to resolve relative urls against.
-    pub fn set_base(&mut self, url: Url) {
-        self.base = Some(url)
+    pub fn set_base(&mut self, iri: Iri) {
+        self.base = Some(iri)
     }
 
     /// Parse graph into a set of Triples.
@@ -124,7 +123,9 @@ impl<'a> Graph<'a> {
         self.take();
 
         while let Some(_) = self.input.peek() {
-            if self.parse_statement().is_none() {
+            if self.input.peek().map(|x| x.as_rule() == Rule::EOI).unwrap() ||
+               self.parse_statement().is_none()
+            {
                 break
             }
         }
@@ -158,7 +159,7 @@ impl<'a> Graph<'a> {
             }
 
             Rule::base | Rule::sparqlBase => {
-                self.base = Some(Url::parse(&self.parse_iriref()?).unwrap());
+                self.base = Some(self.parse_iriref()?);
             },
 
             _ => unreachable!(),
@@ -177,8 +178,9 @@ impl<'a> Graph<'a> {
             },
 
             Rule::blankNodePropertyList => {
-                self.parse_blank_node_property_list()?;
+                let node = self.parse_blank_node_property_list()?;
 
+                self.subject = Some(Subject::BlankNode(node));
                 if self.input.peek()?.as_rule() == Rule::predicateObjectList {
                     self.parse_predicate_object_list()?;
                 }
@@ -204,7 +206,7 @@ impl<'a> Graph<'a> {
     fn parse_verb(&mut self) -> Option<Iri> {
         let next = get!(self: verb);
         if next.as_str() == "a" {
-            Some(Iri(String::from(TYPE_PREDICATE)))
+            Iri::parse(TYPE_PREDICATE).ok()
         } else {
             self.parse_iri()
         }
@@ -244,9 +246,9 @@ impl<'a> Graph<'a> {
     }
 
     fn parse_object_list(&mut self) -> Option<()> {
-        let end_of_list = get!(self: objectList).into_span().end();
+        let end = get!(self: objectList).into_span().end();
 
-        while self.belongs_to_list(Rule::object, end_of_list) {
+        while self.belongs_to_list(Rule::object, end) {
             self.parse_object()?;
         }
 
@@ -256,27 +258,18 @@ impl<'a> Graph<'a> {
     fn parse_object(&mut self) -> Option<()> {
         get!(self: object);
 
-        match self.input.peek()?.as_rule() {
-            r @ Rule::iri |
-            r @ Rule::literal |
-            r @ Rule::BlankNode |
-            r @ Rule::collection =>
-            {
-                let object = match r {
-                    Rule::iri => Object::Iri(self.parse_iri()?),
-                    Rule::literal => Object::Literal(self.parse_literal()?),
-                    Rule::BlankNode => Object::BlankNode(self.parse_blank_node()?),
-                    Rule::collection => self.parse_collection()?,
-                    _ => unreachable!(),
-                };
-
-                self.emit_triple(object);
-            },
-            Rule::blankNodePropertyList => self.parse_blank_node_property_list()?,
-
+        let object = match self.input.peek()?.as_rule() {
+            Rule::iri => Object::Iri(self.parse_iri()?),
+            Rule::literal => Object::Literal(self.parse_literal()?),
+            Rule::BlankNode => Object::BlankNode(self.parse_blank_node()?),
+            Rule::collection => self.parse_collection()?,
+            Rule::blankNodePropertyList => {
+                Object::BlankNode(self.parse_blank_node_property_list()?)
+            }
             _ => unreachable!(),
-        }
+        };
 
+        self.emit_triple(object);
         Some(())
     }
 
@@ -284,10 +277,13 @@ impl<'a> Graph<'a> {
         self.save_subject();
         self.save_predicate();
 
-        let end = self.input.next().unwrap().into_span().end();
+        let end = get!(self: collection).into_span().end();
         let mut node = self.generate_new_blank_node();
 
         if !self.belongs_to_list(Rule::object, end) {
+            self.pop_subject();
+            self.pop_predicate();
+
             Some(Object::Iri(rdf!("nil")))
         } else {
             self.subject = Some(Subject::BlankNode(node.clone()));
@@ -314,18 +310,20 @@ impl<'a> Graph<'a> {
         }
     }
 
-    fn parse_blank_node_property_list(&mut self) -> Option<()> {
+    fn parse_blank_node_property_list(&mut self) -> Option<BlankNode> {
         get!(self: blankNodePropertyList);
 
+        let new_node = self.generate_new_blank_node();
+
         self.save_subject();
-        self.subject = Some(Subject::BlankNode(self.generate_new_blank_node()));
+        self.subject = Some(Subject::BlankNode(new_node.clone()));
         self.save_predicate();
 
         self.parse_predicate_object_list()?;
         self.pop_subject();
         self.pop_predicate();
 
-        Some(())
+        Some(new_node)
     }
 
     fn parse_literal(&mut self) -> Option<Literal> {
@@ -422,11 +420,11 @@ impl<'a> Graph<'a> {
         Some(match self.input.next()?.as_str() {
             "\\t" => '\t',
             "\\b" => '\u{08}',
-            "\\n" => '\t',
-            "\\r" => '\t',
+            "\\n" => '\n',
+            "\\r" => '\r',
             "\\f" => '\u{0C}',
             "\\'" => '\'',
-            "\\\"" => '\'',
+            "\\\"" => '\"',
             "\\\\" => '\\',
             c => unreachable!("Unexpected {:?}", c),
         })
@@ -448,23 +446,23 @@ impl<'a> Graph<'a> {
 
     fn parse_iri(&mut self) -> Option<Iri> {
         get!(self: iri);
-        match self.input.peek()?.as_rule() {
+        let iri = match self.input.peek()?.as_rule() {
             Rule::PrefixedName => self.parse_prefixed_name(),
             Rule::IRIREF => self.parse_iriref(),
             _ => unreachable!(),
-        }
+        };
+
+        iri
     }
 
     fn parse_iriref(&mut self) -> Option<Iri> {
+
         let end = self.input.next().unwrap().into_span().end();
         let mut next_start = self.input.peek()?.clone().into_span().start();
         let mut iriref = String::new();
 
         if next_start > end {
-            return Some(self.base.clone().map_or_else(
-                || Iri(String::new()),
-                |u| { Iri(String::from(u.as_str())) }
-            ))
+            return self.base.clone()
         }
 
         while next_start < end {
@@ -481,13 +479,7 @@ impl<'a> Graph<'a> {
             };
         };
 
-
-        let url = Url::options()
-            .base_url(self.base.as_ref())
-            .parse(iriref.as_str())
-            .unwrap();
-
-        Some(Iri(String::from(url.as_str())))
+        Iri::parse_with_base_iri(&iriref, self.base.as_ref()).ok()
     }
 
     fn parse_prefixed_name(&mut self) -> Option<Iri> {
@@ -505,17 +497,18 @@ impl<'a> Graph<'a> {
     fn parse_pname_ln(&mut self) -> Option<Iri> {
         get!(self: PNAME_LN);
 
-        let mut iri = self.parse_pname_ns()?;
+        let base = self.parse_pname_ns()?;
+        let mut base = base.as_str().to_owned();
         // Replace should work here as the escapes are validated in pest.
         let pn_local = get!(self: PN_LOCAL).as_str().replace('\\', "");
 
-        iri.push_str(&pn_local);
+        base.push_str(&pn_local);
 
-        Some(iri)
+        Iri::parse(&base).ok()
     }
 
     fn parse_pname_ns(&mut self) -> Option<Iri> {
-        let (next_rule, next) = {
+        let (_next_rule, next) = {
             let next = self.input.next()?;
 
             (next.as_rule(), next.as_str())
@@ -526,8 +519,8 @@ impl<'a> Graph<'a> {
     }
 
     fn emit_triple(&mut self, object: Object) -> Option<()> {
-        let subject = self.subject.clone()?;
-        let predicate = self.predicate.clone()?;
+        let subject = self.subject.clone().expect("No Subject found");
+        let predicate = self.predicate.clone().expect("No Predicate found");
 
         self.triples.push(Triple::new(subject, predicate, object));
 
@@ -575,7 +568,8 @@ impl<'a> Graph<'a> {
     }
 
     fn take(&mut self) {
-        self.input.next();
+        let _x = self.input.next();
+        //println!("{:?}", _x.map(|x| x.as_rule()));
     }
 
     fn unreachable(&mut self, rule: Rule, text: &str) -> ! {
