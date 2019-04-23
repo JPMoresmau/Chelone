@@ -457,7 +457,7 @@ impl<'a> Graph<'a> {
 
     fn parse_iriref(&mut self) -> Option<Iri> {
 
-        let end = self.input.next().unwrap().into_span().end();
+        let end = self.input.next()?.into_span().end();
         let mut next_start = self.input.peek()?.clone().into_span().start();
         let mut iriref = String::new();
 
@@ -468,7 +468,7 @@ impl<'a> Graph<'a> {
         while next_start < end {
             match self.input.peek()?.as_rule() {
                 Rule::IRI_VALUE => iriref.push_str(self.input.next()?.as_str()),
-                Rule::UCHAR => iriref.push(self.parse_uchar().unwrap()),
+                Rule::UCHAR => iriref.push(self.parse_uchar()?),
                 _ => unreachable!(),
             }
 
